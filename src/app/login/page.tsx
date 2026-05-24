@@ -32,7 +32,7 @@ function LoginForm() {
 
   return (
     <div style={{
-      minHeight: '100vh', background: '#0d0d0d',
+      minHeight: '100vh', width: '100%', background: '#0d0d0d',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
     }}>
       <div style={{
