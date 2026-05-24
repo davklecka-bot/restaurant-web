@@ -2,7 +2,8 @@ import Database from 'better-sqlite3'
 import path from 'path'
 import fs from 'fs'
 
-const DB_DIR = path.join(process.cwd(), 'data')
+// On Vercel the filesystem is read-only except /tmp
+const DB_DIR = process.env.VERCEL ? '/tmp' : path.join(process.cwd(), 'data')
 const DB_PATH = path.join(DB_DIR, 'restaurants.db')
 
 let db: Database.Database
