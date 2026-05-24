@@ -1,4 +1,4 @@
-import { put, list } from '@vercel/blob'
+import { put, list, del } from '@vercel/blob'
 import path from 'path'
 import fs from 'fs'
 
@@ -51,8 +51,9 @@ async function readBlob(): Promise<DbData> {
   try {
     const { blobs } = await list({ prefix: DATA_KEY })
     if (!blobs.length) return empty()
-    const blob = blobs.find(b => b.pathname === DATA_KEY) ?? blobs[0]
-    const res = await fetch(blob.downloadUrl)
+    // Get the most recently uploaded blob
+    const latest = blobs.sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime())[0]
+    const res = await fetch(latest.downloadUrl)
     if (!res.ok) return empty()
     return await res.json()
   } catch {
@@ -61,10 +62,12 @@ async function readBlob(): Promise<DbData> {
 }
 
 async function writeBlob(data: DbData): Promise<void> {
-  await put(DATA_KEY, JSON.stringify(data), {
-    access: 'private',
-    addRandomSuffix: false,
-  })
+  // Delete old blobs first — private blobs ignore addRandomSuffix:false and each put() creates a new one
+  const { blobs } = await list({ prefix: DATA_KEY })
+  if (blobs.length > 0) {
+    await del(blobs.map(b => b.url))
+  }
+  await put(DATA_KEY, JSON.stringify(data), { access: 'private' })
 }
 
 // --- Local JSON fallback (development) ---
