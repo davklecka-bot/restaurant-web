@@ -1,5 +1,6 @@
 'use client'
 import { useState, useRef, useEffect } from 'react'
+import ApiKeyInput from '@/components/ApiKeyInput'
 
 type Event =
   | { type: 'search'; query: string }
@@ -58,6 +59,7 @@ function EventRow({ event }: { event: Event }) {
 
 export default function AgentClient() {
   const [apiKey, setApiKey] = useState('')
+  const [keyReady, setKeyReady] = useState(false)
   const [running, setRunning] = useState(false)
   const [done, setDone] = useState(false)
   const [logs, setLogs] = useState<LogLine[]>([])
@@ -70,7 +72,7 @@ export default function AgentClient() {
   }, [logs])
 
   async function startAgent() {
-    if (!apiKey.trim()) return
+    if (!keyReady) return
     setRunning(true)
     setDone(false)
     setLogs([])
@@ -123,19 +125,8 @@ export default function AgentClient() {
       {!running && !done && (
         <div style={{ background: '#161616', border: '1px solid #222', borderRadius: 12, padding: 28, maxWidth: 520 }}>
           <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 16 }}>Anthropic API Key</div>
-          <input
-            type="password"
-            placeholder="sk-ant-..."
-            value={apiKey}
-            onChange={e => setApiKey(e.target.value)}
-            style={{
-              width: '100%', background: '#0d0d0d', border: '1px solid #2a2a2a',
-              borderRadius: 8, padding: '10px 14px', color: '#e8e8e8', fontSize: 13,
-              outline: 'none', marginBottom: 16
-            }}
-          />
-          <div style={{ fontSize: 12, color: '#444', marginBottom: 20 }}>
-            Klíč získáš na console.anthropic.com. Nikdy ho neukládáme.
+          <div style={{ marginBottom: 20 }}>
+            <ApiKeyInput onReady={k => { setApiKey(k); setKeyReady(true) }} />
           </div>
           <div style={{ background: '#0f1a10', border: '1px solid #1a2e1a', borderRadius: 8, padding: 16, marginBottom: 20, fontSize: 12, color: '#666' }}>
             <div style={{ color: '#888', marginBottom: 8, fontWeight: 600 }}>Co agent udělá:</div>
@@ -147,12 +138,12 @@ export default function AgentClient() {
           </div>
           <button
             onClick={startAgent}
-            disabled={!apiKey.trim()}
+            disabled={!keyReady}
             style={{
-              background: apiKey.trim() ? '#22c55e' : '#1a2a1a',
-              color: apiKey.trim() ? '#000' : '#333',
+              background: keyReady ? '#22c55e' : '#1a2a1a',
+              color: keyReady ? '#000' : '#333',
               border: 'none', borderRadius: 8, padding: '11px 28px',
-              fontWeight: 700, fontSize: 13, cursor: apiKey.trim() ? 'pointer' : 'default',
+              fontWeight: 700, fontSize: 13, cursor: keyReady ? 'pointer' : 'default',
               transition: 'all 0.15s'
             }}
           >

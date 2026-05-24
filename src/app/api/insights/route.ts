@@ -6,7 +6,8 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
 export async function POST(req: Request) {
-  const { apiKey } = await req.json()
+  const body = await req.json().catch(() => ({}))
+  const apiKey = body.apiKey || process.env.ANTHROPIC_API_KEY
   if (!apiKey) return NextResponse.json({ error: 'Missing apiKey' }, { status: 400 })
 
   const contacts = getAllRestaurants()

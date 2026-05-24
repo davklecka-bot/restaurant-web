@@ -1,13 +1,15 @@
 'use client'
 import { useState } from 'react'
+import ApiKeyInput from '@/components/ApiKeyInput'
 
 export default function InsightsClient() {
   const [apiKey, setApiKey] = useState('')
+  const [keyReady, setKeyReady] = useState(false)
   const [insights, setInsights] = useState('')
   const [loading, setLoading] = useState(false)
 
   async function generate() {
-    if (!apiKey.trim()) return
+    if (!keyReady) return
     setLoading(true)
     setInsights('')
     const res = await fetch('/api/insights', {
@@ -29,22 +31,13 @@ export default function InsightsClient() {
         <p style={{ color: '#555', fontSize: 13 }}>Claude analyzuje odpovědi a generuje market insights</p>
       </div>
 
-      <div style={{ display: 'flex', gap: 12, marginBottom: 28, alignItems: 'center' }}>
-        <input
-          type="password"
-          placeholder="Anthropic API Key..."
-          value={apiKey}
-          onChange={e => setApiKey(e.target.value)}
-          style={{
-            background: '#161616', border: '1px solid #222', borderRadius: 8,
-            padding: '9px 14px', color: '#e8e8e8', fontSize: 13, outline: 'none', width: 280
-          }}
-        />
-        <button onClick={generate} disabled={!apiKey.trim() || loading} style={{
-          background: apiKey.trim() && !loading ? '#a855f7' : '#1a1028',
-          color: apiKey.trim() && !loading ? '#fff' : '#444',
+      <div style={{ display: 'flex', gap: 12, marginBottom: 28, alignItems: 'center', flexWrap: 'wrap' }}>
+        <ApiKeyInput onReady={k => { setApiKey(k); setKeyReady(true) }} />
+        <button onClick={generate} disabled={!keyReady || loading} style={{
+          background: keyReady && !loading ? '#a855f7' : '#1a1028',
+          color: keyReady && !loading ? '#fff' : '#444',
           border: 'none', borderRadius: 8, padding: '10px 22px',
-          fontWeight: 600, fontSize: 13, cursor: apiKey.trim() ? 'pointer' : 'default'
+          fontWeight: 600, fontSize: 13, cursor: keyReady ? 'pointer' : 'default'
         }}>
           {loading ? 'Analyzuji...' : 'Generovat insighty'}
         </button>
