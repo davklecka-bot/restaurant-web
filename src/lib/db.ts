@@ -1,49 +1,10 @@
-import Database from 'better-sqlite3'
-import path from 'path'
-import fs from 'fs'
+import { createClient } from '@supabase/supabase-js'
 
-// On Vercel the filesystem is read-only except /tmp
-const DB_DIR = process.env.VERCEL ? '/tmp' : path.join(process.cwd(), 'data')
-const DB_PATH = path.join(DB_DIR, 'restaurants.db')
-
-let db: Database.Database
-
-export function getDb(): Database.Database {
-  if (!db) {
-    if (!fs.existsSync(DB_DIR)) fs.mkdirSync(DB_DIR, { recursive: true })
-    db = new Database(DB_PATH)
-    db.pragma('journal_mode = WAL')
-    initDb(db)
-  }
-  return db
-}
-
-function initDb(db: Database.Database) {
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS restaurants (
-      id          INTEGER PRIMARY KEY AUTOINCREMENT,
-      name        TEXT NOT NULL,
-      city        TEXT NOT NULL,
-      category    TEXT NOT NULL CHECK(category IN ('casual','premium')),
-      website     TEXT,
-      email       TEXT,
-      instagram   TEXT,
-      facebook    TEXT,
-      phone       TEXT,
-      notes       TEXT,
-      created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-    CREATE TABLE IF NOT EXISTS outreach (
-      id                   INTEGER PRIMARY KEY AUTOINCREMENT,
-      restaurant_id        INTEGER REFERENCES restaurants(id),
-      email_sent_at        DATETIME,
-      followup_sent_at     DATETIME,
-      status               TEXT DEFAULT 'pending',
-      response_text        TEXT,
-      response_received_at DATETIME,
-      created_at           DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-  `)
+function sb() {
+  return createClient(
+    process.env.SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
 }
 
 export type Restaurant = {
@@ -64,68 +25,127 @@ export type Restaurant = {
   response_text?: string
 }
 
-export function saveRestaurant(data: Omit<Restaurant, 'id' | 'created_at'>): { id: number; created: boolean } {
-  const db = getDb()
-  const existing = db.prepare(
-    'SELECT id FROM restaurants WHERE lower(name)=lower(?) AND lower(city)=lower(?)'
-  ).get(data.name, data.city) as { id: number } | undefined
+export async function saveRestaurant(data: Omit<Restaurant, 'id' | 'created_at'>): Promise<{ id: number; created: boolean }> {
+  const client = sb()
+
+  const { data: existing } = await client
+    .from('restaurants')
+    .select('id')
+    .ilike('name', data.name)
+    .ilike('city', data.city)
+    .maybeSingle()
 
   if (existing) {
-    db.prepare(`
-      UPDATE restaurants SET
-        website=COALESCE(?,website), email=COALESCE(?,email),
-        instagram=COALESCE(?,instagram), facebook=COALESCE(?,facebook),
-        phone=COALESCE(?,phone)
-      WHERE id=?
-    `).run(data.website ?? null, data.email ?? null, data.instagram ?? null, data.facebook ?? null, data.phone ?? null, existing.id)
+    const updates: Record<string, string> = {}
+    if (data.website) updates.website = data.website
+    if (data.email) updates.email = data.email
+    if (data.instagram) updates.instagram = data.instagram
+    if (data.facebook) updates.facebook = data.facebook
+    if (data.phone) updates.phone = data.phone
+    if (Object.keys(updates).length > 0) {
+      await client.from('restaurants').update(updates).eq('id', existing.id)
+    }
     return { id: existing.id, created: false }
   }
 
-  const result = db.prepare(`
-    INSERT INTO restaurants (name,city,category,website,email,instagram,facebook,phone,notes)
-    VALUES (?,?,?,?,?,?,?,?,?)
-  `).run(data.name, data.city, data.category, data.website ?? null, data.email ?? null,
-         data.instagram ?? null, data.facebook ?? null, data.phone ?? null, data.notes ?? null)
+  const { data: inserted, error } = await client
+    .from('restaurants')
+    .insert({
+      name: data.name,
+      city: data.city,
+      category: data.category,
+      website: data.website ?? null,
+      email: data.email ?? null,
+      instagram: data.instagram ?? null,
+      facebook: data.facebook ?? null,
+      phone: data.phone ?? null,
+      notes: data.notes ?? null,
+    })
+    .select('id')
+    .single()
 
-  const id = result.lastInsertRowid as number
-  db.prepare('INSERT INTO outreach (restaurant_id) VALUES (?)').run(id)
-  return { id, created: true }
+  if (error || !inserted) throw new Error(error?.message ?? 'Insert failed')
+
+  await client.from('outreach').insert({ restaurant_id: inserted.id })
+  return { id: inserted.id, created: true }
 }
 
-export function getAllRestaurants(): Restaurant[] {
-  const db = getDb()
-  return db.prepare(`
-    SELECT r.*, o.status, o.email_sent_at, o.followup_sent_at, o.response_text
-    FROM restaurants r
-    LEFT JOIN outreach o ON o.restaurant_id = r.id
-    ORDER BY r.city, r.category, r.name
-  `).all() as Restaurant[]
+export async function getAllRestaurants(): Promise<Restaurant[]> {
+  const { data } = await sb()
+    .from('restaurants')
+    .select('*, outreach(status, email_sent_at, followup_sent_at, response_text)')
+    .order('city').order('category').order('name')
+
+  return (data ?? []).map((r: any) => {
+    const o = Array.isArray(r.outreach) ? r.outreach[0] : r.outreach
+    return { ...r, ...(o ?? {}), outreach: undefined }
+  })
 }
 
-export function getStats() {
-  const db = getDb()
-  const total = (db.prepare('SELECT COUNT(*) as c FROM restaurants').get() as any).c
-  const withEmail = (db.prepare('SELECT COUNT(*) as c FROM restaurants WHERE email IS NOT NULL').get() as any).c
-  const byCity = db.prepare('SELECT city, COUNT(*) as c FROM restaurants GROUP BY city ORDER BY c DESC').all() as { city: string; c: number }[]
-  const byStatus = db.prepare("SELECT status, COUNT(*) as c FROM outreach GROUP BY status").all() as { status: string; c: number }[]
-  const responded = (db.prepare("SELECT COUNT(*) as c FROM outreach WHERE status='responded'").get() as any).c
-  const sent = (db.prepare("SELECT COUNT(*) as c FROM outreach WHERE email_sent_at IS NOT NULL").get() as any).c
+export async function getStats() {
+  const client = sb()
+  const [{ data: restaurants }, { data: outreach }] = await Promise.all([
+    client.from('restaurants').select('city, email'),
+    client.from('outreach').select('status, email_sent_at'),
+  ])
+
+  const total = restaurants?.length ?? 0
+  const withEmail = restaurants?.filter((r: any) => r.email).length ?? 0
+
+  const cityMap: Record<string, number> = {}
+  for (const r of restaurants ?? []) {
+    cityMap[r.city] = (cityMap[r.city] ?? 0) + 1
+  }
+  const byCity = Object.entries(cityMap)
+    .map(([city, c]) => ({ city, c }))
+    .sort((a, b) => b.c - a.c)
+
+  const statusMap: Record<string, number> = {}
+  for (const o of outreach ?? []) {
+    const s = o.status ?? 'pending'
+    statusMap[s] = (statusMap[s] ?? 0) + 1
+  }
+  const byStatus = Object.entries(statusMap).map(([status, c]) => ({ status, c }))
+
+  const responded = outreach?.filter((o: any) => o.status === 'responded').length ?? 0
+  const sent = outreach?.filter((o: any) => o.email_sent_at).length ?? 0
+
   return { total, withEmail, byCity, byStatus, responded, sent }
 }
 
-export function getPendingEmails() {
-  const db = getDb()
-  return db.prepare(`
-    SELECT r.*, o.id as outreach_id
-    FROM restaurants r JOIN outreach o ON o.restaurant_id = r.id
-    WHERE r.email IS NOT NULL AND o.email_sent_at IS NULL
-  `).all() as (Restaurant & { outreach_id: number })[]
+export async function getPendingEmails() {
+  const client = sb()
+  const { data: pending } = await client
+    .from('outreach')
+    .select('id, restaurant_id')
+    .is('email_sent_at', null)
+
+  if (!pending?.length) return []
+
+  const ids = pending.map((p: any) => p.restaurant_id)
+  const { data: restaurants } = await client
+    .from('restaurants')
+    .select('*')
+    .in('id', ids)
+    .not('email', 'is', null)
+
+  return (restaurants ?? []).map((r: any) => ({
+    ...r,
+    outreach_id: pending.find((p: any) => p.restaurant_id === r.id)?.id,
+  })) as (Restaurant & { outreach_id: number })[]
 }
 
-export function markEmailSent(outreachId: number) {
-  getDb().prepare("UPDATE outreach SET email_sent_at=datetime('now'), status='sent' WHERE id=?").run(outreachId)
+export async function markEmailSent(outreachId: number) {
+  await sb()
+    .from('outreach')
+    .update({ email_sent_at: new Date().toISOString(), status: 'sent' })
+    .eq('id', outreachId)
 }
 
-export function countByCity(city: string): number {
-  return ((getDb().prepare('SELECT COUNT(*) as c FROM restaurants WHERE lower(city)=lower(?)').get(city) as any)?.c ?? 0)
+export async function countByCity(city: string): Promise<number> {
+  const { count } = await sb()
+    .from('restaurants')
+    .select('*', { count: 'exact', head: true })
+    .ilike('city', city)
+  return count ?? 0
 }

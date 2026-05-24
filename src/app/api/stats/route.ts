@@ -3,9 +3,9 @@ import { getStats } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
 
-export function GET() {
+export async function GET() {
   try {
-    return NextResponse.json(getStats())
+    return NextResponse.json(await getStats())
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }

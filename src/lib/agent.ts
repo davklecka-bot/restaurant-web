@@ -94,7 +94,7 @@ export async function* runResearchAgent(apiKey: string): AsyncGenerator<AgentEve
 
     if (response.stop_reason === 'end_turn') {
       const { getStats } = await import('./db')
-      const s = getStats()
+      const s = await getStats()
       yield { type: 'done', stats: { total: s.total, withEmail: s.withEmail } }
       return
     }
@@ -116,11 +116,11 @@ export async function* runResearchAgent(apiKey: string): AsyncGenerator<AgentEve
           result = await scrapeUrl(input.url)
           await sleep(1000)
         } else if (block.name === 'save_restaurant') {
-          result = saveRestaurant(input as any)
+          result = await saveRestaurant(input as any)
           savedCount++
           yield { type: 'save', name: input.name, city: input.city, hasEmail: !!input.email, count: savedCount }
         } else if (block.name === 'count_restaurants') {
-          result = { city: input.city, count: countByCity(input.city) }
+          result = { city: input.city, count: await countByCity(input.city) }
         }
 
         toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: JSON.stringify(result) })

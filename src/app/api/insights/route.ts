@@ -10,7 +10,7 @@ export async function POST(req: Request) {
   const apiKey = body.apiKey || process.env.ANTHROPIC_API_KEY
   if (!apiKey) return NextResponse.json({ error: 'Missing apiKey' }, { status: 400 })
 
-  const contacts = getAllRestaurants()
+  const contacts = await getAllRestaurants()
   const responses = contacts.filter(c => c.response_text)
 
   if (responses.length === 0) {
