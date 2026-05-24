@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
-import { saveRestaurant, countByCity } from './db'
+import { saveRestaurant, countByCity, getAllRestaurants } from './db'
 import { searchWeb, scrapeUrl } from './searcher'
 
 const CITIES = ['Praha', 'Brno', 'Ostrava', 'Plzeň', 'Liberec']
@@ -22,7 +22,7 @@ const TOOLS: Anthropic.Tool[] = [
   },
   {
     name: 'save_restaurant',
-    description: 'Ulož restauraci do databáze. Vrátí {id,created}.',
+    description: 'Ulož restauraci do databáze. Vrátí {id,created}. Pokud created=false, restaurace již existuje — hledej jinou.',
     input_schema: {
       type: 'object',
       properties: {
@@ -37,21 +37,25 @@ const TOOLS: Anthropic.Tool[] = [
   },
   {
     name: 'count_restaurants',
-    description: 'Vrátí počet restaurací pro dané město.',
+    description: 'Vrátí počet nových restaurací (celkem i cíl) pro dané město.',
     input_schema: { type: 'object', properties: { city: { type: 'string' } }, required: ['city'] }
   }
 ]
 
 const SYSTEM = `Jsi agent pro market research restaurací v ČR (téma: rezervační systémy).
 
-Pro každé město (${CITIES.join(', ')}):
-1. count_restaurants → zjisti aktuální stav
-2. Hledej dokud nemáš ~${TARGET_PER_CITY} restaurací
-3. casual = hospody, pivnice, pizzerie, asijské, burgerárny
-4. premium = fine dining, gastropodniky, wine bary
-5. Pro každý web: scrape_url → save_restaurant
-6. Ignoruj agregátory (TripAdvisor, Zomato, Firmy.cz)
-7. Bez emailu ulož i tak (web + sociální sítě mají hodnotu)`
+DŮLEŽITÉ: Databáze již může obsahovat restaurace z předchozích běhů. Cíl je přidat NOVÉ restaurace.
+
+Pro každé město:
+1. count_restaurants → zjisti kolik jich už je a kolik ještě chybí do cíle
+2. Pokud město má >= ${TARGET_PER_CITY} restaurací, přeskoč ho (nebo hledej další nad cíl)
+3. Hledej pouze restaurace KTERÉ JEŠTĚ NEJSOU v databázi (viz seznam níže)
+4. casual = hospody, pivnice, pizzerie, asijské, burgerárny
+5. premium = fine dining, gastropodniky, wine bary
+6. Pro každý web: scrape_url → save_restaurant
+7. Pokud save_restaurant vrátí {created: false}, restaurace už existuje — hledej jinou
+8. Ignoruj agregátory (TripAdvisor, Zomato, Firmy.cz)
+9. Bez emailu ulož i tak (web + sociální sítě mají hodnotu)`
 
 export type AgentEvent =
   | { type: 'search'; query: string }
@@ -63,9 +67,30 @@ export type AgentEvent =
 
 export async function* runResearchAgent(apiKey: string): AsyncGenerator<AgentEvent> {
   const client = new Anthropic({ apiKey })
+
+  // Load existing restaurants to tell the agent what's already saved
+  const existing = await getAllRestaurants()
+  const existingByCity: Record<string, string[]> = {}
+  for (const r of existing) {
+    if (!existingByCity[r.city]) existingByCity[r.city] = []
+    existingByCity[r.city].push(r.name)
+  }
+
+  const existingSummary = existing.length === 0
+    ? 'Databáze je prázdná — hledej vše od začátku.'
+    : `Již uloženo ${existing.length} restaurací:\n` +
+      Object.entries(existingByCity)
+        .map(([city, names]) => `${city} (${names.length}): ${names.join(', ')}`)
+        .join('\n')
+
+  const citiesToProcess = CITIES.filter(city => (existingByCity[city]?.length ?? 0) < TARGET_PER_CITY)
+  const taskDesc = citiesToProcess.length === 0
+    ? `Všechna města mají >= ${TARGET_PER_CITY} restaurací. Přidej dalších 5 do každého města nad cíl.`
+    : `Zpracuj tato města: ${citiesToProcess.join(', ')}. V každém najdi restaurace do celkového počtu ${TARGET_PER_CITY}. Ke každé scrape web pro email.`
+
   const messages: Anthropic.MessageParam[] = [{
     role: 'user',
-    content: `Začni market research. Zpracuj tato města: ${CITIES.join(', ')}. V každém najdi ${TARGET_PER_CITY} restaurací. Ke každé scrape web pro email.`
+    content: `${taskDesc}\n\n${existingSummary}`
   }]
 
   let savedCount = 0
@@ -117,10 +142,14 @@ export async function* runResearchAgent(apiKey: string): AsyncGenerator<AgentEve
           await sleep(1000)
         } else if (block.name === 'save_restaurant') {
           result = await saveRestaurant(input as any)
-          savedCount++
-          yield { type: 'save', name: input.name, city: input.city, hasEmail: !!input.email, count: savedCount }
+          const r = result as { id: number; created: boolean }
+          if (r.created) {
+            savedCount++
+            yield { type: 'save', name: input.name, city: input.city, hasEmail: !!input.email, count: savedCount }
+          }
         } else if (block.name === 'count_restaurants') {
-          result = { city: input.city, count: await countByCity(input.city) }
+          const count = await countByCity(input.city)
+          result = { city: input.city, count, target: TARGET_PER_CITY, remaining: Math.max(0, TARGET_PER_CITY - count) }
         }
 
         toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: JSON.stringify(result) })
