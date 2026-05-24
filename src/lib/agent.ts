@@ -52,10 +52,17 @@ Pro každé město:
 3. Hledej pouze restaurace KTERÉ JEŠTĚ NEJSOU v databázi (viz seznam níže)
 4. casual = hospody, pivnice, pizzerie, asijské, burgerárny
 5. premium = fine dining, gastropodniky, wine bary
-6. Pro každý web: scrape_url → save_restaurant
+6. Pokud restaurace má web → scrape_url pro získání kontaktů → save_restaurant
 7. Pokud save_restaurant vrátí {created: false}, restaurace už existuje — hledej jinou
-8. Ignoruj agregátory (TripAdvisor, Zomato, Firmy.cz)
-9. Bez emailu ulož i tak (web + sociální sítě mají hodnotu)`
+8. Ignoruj agregátory (TripAdvisor, Zomato, Firmy.cz, seznam.cz restaurace)
+
+UKLÁDÁNÍ KONTAKTŮ — ulož vždy, i když chybí některé údaje:
+- Má web ale ne email → ulož (web má hodnotu)
+- Má jen telefon, žádný web ani email → ulož (phone = kontakt pro outreach)
+- Má jen Instagram nebo Facebook, žádný web → ulož (social = kontakt)
+- Nemá vůbec nic online → ulož jen name + city + category (víme že existuje)
+- Nikdy nepřeskakuj restauraci jen proto, že nemá email nebo web
+- Do pole "notes" zapiš co chybí, např. "pouze telefon" nebo "bez online přítomnosti"`
 
 export type AgentEvent =
   | { type: 'search'; query: string }
