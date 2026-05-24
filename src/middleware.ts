@@ -7,8 +7,9 @@ export function middleware(request: NextRequest) {
   // Skip if no password is configured
   if (!APP_PASSWORD) return NextResponse.next()
 
-  // Skip the login page itself
+  // Skip the login page and debug endpoint
   if (request.nextUrl.pathname === '/login') return NextResponse.next()
+  if (request.nextUrl.pathname === '/api/debug-env') return NextResponse.next()
 
   // Check session cookie
   const session = request.cookies.get('session')?.value

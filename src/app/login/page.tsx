@@ -1,11 +1,12 @@
 'use client'
-import { useState, Suspense } from 'react'
+import { useState, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 
 function LoginForm() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
   const params = useSearchParams()
   const from = params.get('from') || '/'
@@ -15,10 +16,13 @@ function LoginForm() {
     setLoading(true)
     setError('')
 
+    // Read directly from DOM to catch browser autofill
+    const actualPassword = inputRef.current?.value || password
+
     const res = await fetch('/api/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password }),
+      body: JSON.stringify({ password: actualPassword }),
     })
 
     if (res.ok) {
@@ -51,6 +55,7 @@ function LoginForm() {
             Heslo
           </label>
           <input
+            ref={inputRef}
             type="password"
             value={password}
             onChange={e => setPassword(e.target.value)}
@@ -67,12 +72,12 @@ function LoginForm() {
           )}
           <button
             type="submit"
-            disabled={!password || loading}
+            disabled={loading}
             style={{
-              width: '100%', background: password && !loading ? '#22c55e' : '#1a2a1a',
-              color: password && !loading ? '#000' : '#333',
+              width: '100%', background: loading ? '#1a2a1a' : '#22c55e',
+              color: loading ? '#333' : '#000',
               border: 'none', borderRadius: 8, padding: '11px',
-              fontWeight: 700, fontSize: 14, cursor: password ? 'pointer' : 'default',
+              fontWeight: 700, fontSize: 14, cursor: loading ? 'default' : 'pointer',
             }}
           >
             {loading ? 'Přihlašuji...' : 'Vstoupit'}
