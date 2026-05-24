@@ -47,8 +47,8 @@ export default function Sidebar() {
       </nav>
 
       <div style={{ padding: '16px 20px', borderTop: '1px solid #222' }}>
-        <div style={{ fontSize: 11, color: '#444' }}>Powered by Claude</div>
-        <div style={{ fontSize: 11, color: '#333', marginTop: 2 }}>claude-sonnet-4-6</div>
+        <div style={{ fontSize: 11, color: '#444' }}>Powered by David Klečka</div>
+        <div style={{ fontSize: 11, color: '#333', marginTop: 2 }}>tidabo</div>
       </div>
     </aside>
   )
