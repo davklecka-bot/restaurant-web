@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.98.0",
-    "@supabase/supabase-js": "^2.106.1",
+    "@vercel/blob": "^2.4.0",
     "axios": "^1.16.1",
     "cheerio": "^1.2.0",
     "class-variance-authority": "^0.7.1",
