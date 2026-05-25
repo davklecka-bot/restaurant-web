@@ -6,12 +6,27 @@ import Link from 'next/link'
 export default function OutreachClient() {
   const [data, setData] = useState<Restaurant[]>([])
   const [loading, setLoading] = useState(true)
+  const [sending, setSending] = useState(false)
+  const [sendResult, setSendResult] = useState<{ sent: number; total: number; errors: string[] } | null>(null)
 
   useEffect(() => {
     fetch('/api/restaurants').then(r => r.json()).then((d: Restaurant[]) => {
       setData(d); setLoading(false)
     })
   }, [])
+
+  async function sendEmails() {
+    setSending(true)
+    setSendResult(null)
+    const res = await fetch('/api/send-emails', { method: 'POST' })
+    const json = await res.json()
+    setSendResult(json)
+    setSending(false)
+    if (json.sent > 0) {
+      const updated = await fetch('/api/restaurants').then(r => r.json())
+      setData(updated)
+    }
+  }
 
   const withEmail = data.filter(r => r.email)
   const pending = withEmail.filter(r => !r.email_sent_at)
@@ -88,8 +103,29 @@ export default function OutreachClient() {
             ))}
           </div>
 
-          <div style={{ background: '#0f1a10', border: '1px solid #1a2e1a', borderRadius: 10, padding: '14px 20px', marginBottom: 24, fontSize: 12, color: '#4a8a4a' }}>
-            💡 Pro odesílání emailů použij příkazový řádek: <code style={{ background: '#0d0d0d', padding: '2px 6px', borderRadius: 4 }}>run.bat send</code> ve složce restaurant_agent
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24, flexWrap: 'wrap' }}>
+            <button
+              onClick={sendEmails}
+              disabled={sending || pending.length === 0}
+              style={{
+                background: pending.length > 0 && !sending ? '#3b82f6' : '#1a1a2a',
+                color: pending.length > 0 && !sending ? '#fff' : '#444',
+                border: 'none', borderRadius: 8, padding: '10px 22px',
+                fontWeight: 600, fontSize: 13,
+                cursor: pending.length > 0 && !sending ? 'pointer' : 'default',
+                transition: 'all 0.15s'
+              }}
+            >
+              {sending ? 'Odesílám...' : `Odeslat emaily (${pending.length})`}
+            </button>
+
+            {sendResult && (
+              <div style={{ fontSize: 13, color: sendResult.sent > 0 ? '#22c55e' : '#f97316' }}>
+                {sendResult.sent > 0
+                  ? `✓ Odesláno ${sendResult.sent} z ${sendResult.total}`
+                  : sendResult.errors?.[0] ?? sendResult.message}
+              </div>
+            )}
           </div>
 
           <Section title="Čeká na odeslání" items={pending} color="#f97316" emptyMsg="Všechny emaily byly odeslány" />
