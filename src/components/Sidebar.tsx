@@ -60,15 +60,21 @@ export default function Sidebar() {
       </div>
 
       <nav style={{ padding: '12px 8px', flex: 1 }}>
-        {NAV_MAIN.map(renderLink)}
+        <div style={{
+          fontSize: 10, color: '#444', letterSpacing: 1.5,
+          textTransform: 'uppercase', padding: '8px 12px 6px'
+        }}>
+          Agenti
+        </div>
+        {NAV_AGENTS.map(renderLink)}
 
         <div style={{
           fontSize: 10, color: '#444', letterSpacing: 1.5,
           textTransform: 'uppercase', padding: '16px 12px 6px'
         }}>
-          Agenti
+          Přehled
         </div>
-        {NAV_AGENTS.map(renderLink)}
+        {NAV_MAIN.map(renderLink)}
       </nav>
 
       <div style={{ padding: '16px 20px', borderTop: '1px solid #222' }}>
