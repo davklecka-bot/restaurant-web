@@ -1,6 +1,5 @@
 'use client'
 import { useState, useRef, useEffect } from 'react'
-import ApiKeyInput from '@/components/ApiKeyInput'
 
 type Event =
   | { type: 'search'; query: string }
@@ -39,10 +38,7 @@ function EventRow({ event }: { event: Event }) {
     <div style={{ padding: '5px 0', color: '#555', fontSize: 12, fontStyle: 'italic' }}>{event.text}</div>
   )
   if (event.type === 'done') return (
-    <div style={{
-      padding: '12px 16px', background: '#0f2a1a', border: '1px solid #1a4a2a',
-      borderRadius: 8, marginTop: 8
-    }}>
+    <div style={{ padding: '12px 16px', background: '#0f2a1a', border: '1px solid #1a4a2a', borderRadius: 8, marginTop: 8 }}>
       <div style={{ color: '#22c55e', fontWeight: 700, fontSize: 14 }}>✓ Výzkum dokončen</div>
       <div style={{ color: '#888', fontSize: 12, marginTop: 4 }}>
         Celkem: {event.stats.total} restaurací · S emailem: {event.stats.withEmail}
@@ -58,8 +54,6 @@ function EventRow({ event }: { event: Event }) {
 }
 
 export default function AgentClient() {
-  const [apiKey, setApiKey] = useState('')
-  const [keyReady, setKeyReady] = useState(false)
   const [running, setRunning] = useState(false)
   const [done, setDone] = useState(false)
   const [logs, setLogs] = useState<LogLine[]>([])
@@ -72,7 +66,7 @@ export default function AgentClient() {
   }, [logs])
 
   async function startAgent() {
-    if (!keyReady) return
+    if (running) return
     setRunning(true)
     setDone(false)
     setLogs([])
@@ -82,13 +76,10 @@ export default function AgentClient() {
     const res = await fetch('/api/agent', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ apiKey })
+      body: JSON.stringify({})
     })
 
-    if (!res.ok || !res.body) {
-      setRunning(false)
-      return
-    }
+    if (!res.ok || !res.body) { setRunning(false); return }
 
     const reader = res.body.getReader()
     const decoder = new TextDecoder()
@@ -117,73 +108,81 @@ export default function AgentClient() {
 
   return (
     <div>
-      <div style={{ marginBottom: 32 }}>
-        <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 4 }}>Agent</h1>
-        <p style={{ color: '#555', fontSize: 13 }}>Claude autonomně hledá restaurace, scrape kontakty a ukládá do databáze</p>
+      {/* Agent header card */}
+      <div style={{
+        background: '#161616', border: '1px solid #222', borderRadius: 12,
+        padding: '20px 24px', marginBottom: 24, maxWidth: 520,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div style={{
+            width: 40, height: 40, borderRadius: 10, background: '#1e1e1e',
+            border: '1px solid #2a2a2a', display: 'flex', alignItems: 'center',
+            justifyContent: 'center', fontSize: 18
+          }}>◎</div>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: '#e8e8e8' }}>Miro</div>
+            <div style={{ fontSize: 12, color: '#555', marginTop: 2 }}>Research agent</div>
+          </div>
+        </div>
+
+        {/* Status indicator */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{
+            width: 8, height: 8, borderRadius: '50%',
+            background: running ? '#22c55e' : '#2a2a2a',
+            boxShadow: running ? '0 0 8px #22c55e88' : 'none',
+            transition: 'all 0.3s',
+            animation: running ? 'pulse 1.5s infinite' : 'none'
+          }} />
+          <span style={{ fontSize: 12, color: running ? '#22c55e' : '#444' }}>
+            {running ? 'aktivní' : done ? 'dokončeno' : 'neaktivní'}
+          </span>
+        </div>
       </div>
 
+      {/* Start panel */}
       {!running && !done && (
-        <div style={{ background: '#161616', border: '1px solid #222', borderRadius: 12, padding: 28, maxWidth: 520 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 16 }}>Anthropic API Key</div>
-          <div style={{ marginBottom: 20 }}>
-            <ApiKeyInput onReady={k => { setApiKey(k); setKeyReady(true) }} />
-          </div>
+        <div style={{ background: '#161616', border: '1px solid #222', borderRadius: 12, padding: 24, maxWidth: 520 }}>
           <div style={{ background: '#0f1a10', border: '1px solid #1a2e1a', borderRadius: 8, padding: 16, marginBottom: 20, fontSize: 12, color: '#666' }}>
-            <div style={{ color: '#888', marginBottom: 8, fontWeight: 600 }}>Co agent udělá:</div>
+            <div style={{ color: '#888', marginBottom: 8, fontWeight: 600 }}>Co Miro udělá:</div>
             <div>• Praha, Brno, Ostrava, Plzeň, Liberec</div>
             <div>• ~15 restaurací na město (casual + premium)</div>
             <div>• Scrape každý web pro email + sociální sítě</div>
             <div>• Uloží ~75 kontaktů do databáze</div>
             <div style={{ marginTop: 8, color: '#444' }}>Odhadovaný čas: 10–20 minut</div>
           </div>
-          <button
-            onClick={startAgent}
-            disabled={!keyReady}
-            style={{
-              background: keyReady ? '#22c55e' : '#1a2a1a',
-              color: keyReady ? '#000' : '#333',
-              border: 'none', borderRadius: 8, padding: '11px 28px',
-              fontWeight: 700, fontSize: 13, cursor: keyReady ? 'pointer' : 'default',
-              transition: 'all 0.15s'
-            }}
-          >
-            Spustit agenta
+          <button onClick={startAgent} style={{
+            background: '#22c55e', color: '#000',
+            border: 'none', borderRadius: 8, padding: '11px 28px',
+            fontWeight: 700, fontSize: 13, cursor: 'pointer', transition: 'all 0.15s'
+          }}>
+            Spustit Mira
           </button>
         </div>
       )}
 
+      {/* Log */}
       {(running || logs.length > 0) && (
-        <div style={{ background: '#0d0d0d', border: '1px solid #1e1e1e', borderRadius: 12, overflow: 'hidden' }}>
+        <div style={{ background: '#0d0d0d', border: '1px solid #1e1e1e', borderRadius: 12, overflow: 'hidden', maxWidth: 720 }}>
           <div style={{
             padding: '12px 20px', borderBottom: '1px solid #1a1a1a',
             display: 'flex', justifyContent: 'space-between', alignItems: 'center',
             background: '#111'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              {running && (
-                <div style={{
-                  width: 8, height: 8, borderRadius: '50%', background: '#22c55e',
-                  animation: 'pulse 1.5s infinite'
-                }} />
-              )}
-              <span style={{ fontSize: 13, color: '#888' }}>
-                {running ? 'Agent běží...' : done ? 'Dokončeno' : 'Log'}
-              </span>
-            </div>
+            <span style={{ fontSize: 13, color: '#888' }}>
+              {running ? 'Miro pracuje...' : done ? 'Dokončeno' : 'Log'}
+            </span>
             <div style={{ fontSize: 12, color: '#555' }}>{savedCount} restaurací uloženo</div>
           </div>
           <div ref={logRef} style={{ padding: '16px 20px', maxHeight: 520, overflowY: 'auto', fontFamily: 'monospace' }}>
             {logs.map(({ id, event }) => <EventRow key={id} event={event} />)}
-            {running && (
-              <div style={{ color: '#333', fontSize: 12, marginTop: 8 }}>▌</div>
-            )}
+            {running && <div style={{ color: '#333', fontSize: 12, marginTop: 8 }}>▌</div>}
           </div>
         </div>
       )}
 
-      <style>{`
-        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
-      `}</style>
+      <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }`}</style>
     </div>
   )
 }
