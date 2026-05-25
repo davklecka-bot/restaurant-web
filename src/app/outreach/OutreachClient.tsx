@@ -7,7 +7,7 @@ export default function OutreachClient() {
   const [data, setData] = useState<Restaurant[]>([])
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
-  const [sendResult, setSendResult] = useState<{ sent: number; total: number; errors: string[] } | null>(null)
+  const [sendResult, setSendResult] = useState<{ sent: number; total?: number; errors?: string[]; message?: string; error?: string } | null>(null)
 
   useEffect(() => {
     fetch('/api/restaurants').then(r => r.json()).then((d: Restaurant[]) => {
@@ -123,7 +123,7 @@ export default function OutreachClient() {
               <div style={{ fontSize: 13, color: sendResult.sent > 0 ? '#22c55e' : '#f97316' }}>
                 {sendResult.sent > 0
                   ? `✓ Odesláno ${sendResult.sent} z ${sendResult.total}`
-                  : sendResult.errors?.[0] ?? sendResult.message}
+                  : sendResult.errors?.[0] ?? sendResult.message ?? sendResult.error}
               </div>
             )}
           </div>
