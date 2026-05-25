@@ -118,10 +118,7 @@ export default function AgentClient() {
   return (
     <div>
       <div style={{ marginBottom: 32 }}>
-        <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 10 }}>
-          Agent
-          <span style={{ fontSize: 11, fontWeight: 600, color: '#f97316', background: '#1a0f00', border: '1px solid #f9731633', borderRadius: 6, padding: '2px 8px', letterSpacing: 1, textTransform: 'uppercase' }}>beta</span>
-        </h1>
+        <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 4 }}>Agent</h1>
         <p style={{ color: '#555', fontSize: 13 }}>Claude autonomně hledá restaurace, scrape kontakty a ukládá do databáze</p>
       </div>
 

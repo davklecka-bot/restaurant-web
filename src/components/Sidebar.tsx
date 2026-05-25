@@ -10,7 +10,7 @@ const NAV_MAIN = [
 ]
 
 const NAV_AGENTS = [
-  { href: '/agent', label: 'Research', icon: '◎', beta: true },
+  { href: '/agent', label: 'Research', icon: '◎' },
 ]
 
 export default function Sidebar() {
@@ -49,10 +49,10 @@ export default function Sidebar() {
     }}>
       <div style={{ padding: '0 20px 24px', borderBottom: '1px solid #222' }}>
         <div style={{ fontSize: 16, fontWeight: 700, color: '#e8e8e8', display: 'flex', alignItems: 'center', gap: 8 }}>
-          Restaurace Agent
+          Restaurace
           <span style={{
-            fontSize: 9, fontWeight: 600, color: '#f97316',
-            background: '#1a0f00', border: '1px solid #f9731633',
+            fontSize: 9, fontWeight: 600, color: '#e8e8e8',
+            background: '#000', border: '1px solid #333',
             borderRadius: 4, padding: '1px 5px', letterSpacing: 1,
             textTransform: 'uppercase'
           }}>beta</span>
